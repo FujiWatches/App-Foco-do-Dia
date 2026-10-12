@@ -1,0 +1,908 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0F6E8C">
+<meta name="description" content="Lembrete diário das suas prioridades, com diário de fotos e resumo semanal.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Foco do Dia">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>Foco do Dia</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Public+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Layout: uma coluna estreita. O porquê fica no topo, as prioridades de hoje são linhas grandes de tocar, o histórico vem por último. */
+:root {
+  --bg: #F1F4F6;
+  --surface: #FFFFFF;
+  --ink: #14212B;
+  --muted: #566774;
+  --line: #D3DCE2;
+  --soft: #E3EAEE;
+  --accent: #0F6E8C;
+  --accent-ink: #FFFFFF;
+  --done: #23775A;
+  --done-bg: #E2F1EA;
+  --font-display: 'Bricolage Grotesque', 'Segoe UI', system-ui, sans-serif;
+  --font-body: 'Public Sans', 'Segoe UI', system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0E161C; --surface: #16212A; --ink: #E8EEF2; --muted: #94A4B0; --line: #29363F; --soft: #1F2D37;
+    --accent: #5CC0DE; --accent-ink: #062029; --done: #5BC08F; --done-bg: #173126;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0E161C; --surface: #16212A; --ink: #E8EEF2; --muted: #94A4B0; --line: #29363F; --soft: #1F2D37;
+  --accent: #5CC0DE; --accent-ink: #062029; --done: #5BC08F; --done-bg: #173126;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 16px; line-height: 1.5; }
+.wrap { max-width: 640px; margin-inline: auto; padding-inline: 16px; padding-block: 28px 110px; display: flex; flex-direction: column; gap: 28px; }
+h1, h2 { font-family: var(--font-display); margin: 0; text-wrap: balance; }
+h1 { font-size: 2.1rem; line-height: 1.1; letter-spacing: -0.01em; }
+h2 { font-size: 1.15rem; }
+p { margin: 0; }
+button { font: inherit; color: inherit; cursor: pointer; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.eyebrow { font-size: 0.8rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.lede { color: var(--muted); margin-top: 6px; }
+
+.why { display: flex; flex-direction: column; gap: 8px; }
+.why label { font-family: var(--font-display); font-weight: 700; font-size: 1.15rem; }
+.why textarea { width: 100%; min-height: 110px; resize: vertical; font: inherit; font-size: 1.1rem; line-height: 1.5; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 10px; padding: 14px 16px; }
+.why textarea::placeholder { color: var(--muted); }
+.hint { font-size: 0.875rem; color: var(--muted); }
+
+.sect-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.count { font-family: var(--font-display); font-weight: 700; font-size: 1.15rem; font-variant-numeric: tabular-nums; }
+.bar { height: 8px; border-radius: 99px; background: var(--soft); overflow: hidden; margin-top: 10px; }
+.bar span { display: block; height: 100%; width: 0; background: var(--done); border-radius: 99px; transition: width .25s ease; }
+.msg { margin-top: 10px; font-weight: 500; }
+.stats { display: flex; flex-wrap: wrap; gap: 8px 32px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
+.stat { display: flex; flex-direction: column; min-width: 0; }
+.stat b { font-family: var(--font-display); font-size: 1.4rem; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.stat span { font-size: 0.8rem; color: var(--muted); }
+
+ul { list-style: none; margin: 16px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.item { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px; }
+.item.is-done { background: var(--done-bg); border-color: transparent; }
+.check { flex: none; width: 44px; height: 44px; border-radius: 50%; border: 2px solid var(--accent); background: transparent; display: grid; place-items: center; padding: 0; color: var(--accent-ink); }
+.check svg { width: 22px; height: 22px; opacity: 0; }
+.is-done .check { background: var(--done); border-color: var(--done); }
+.is-done .check svg { opacity: 1; }
+.body { flex: 1 1 150px; min-width: 0; }
+.name { font-weight: 600; font-size: 1.05rem; overflow-wrap: anywhere; }
+.is-done .name { text-decoration: line-through; text-decoration-thickness: 1px; color: var(--muted); }
+.min { font-size: 0.875rem; color: var(--muted); overflow-wrap: anywhere; }
+.pill { flex: none; border: 1px solid var(--line); background: var(--surface); color: var(--accent); font-weight: 600; font-size: 0.875rem; border-radius: 99px; padding: 8px 14px; min-height: 40px; }
+.is-done .pill { display: none; }
+
+.chip { border: 1px solid var(--line); background: var(--surface); border-radius: 99px; padding: 6px 14px; min-height: 36px; font-variant-numeric: tabular-nums; }
+.chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+
+.hist { display: grid; grid-template-columns: repeat(14, minmax(0, 1fr)); gap: 4px; margin-top: 14px; }
+.hcol { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; }
+.cell { width: 100%; aspect-ratio: 1; border-radius: 5px; background: color-mix(in srgb, var(--accent) calc(var(--p) * 1%), var(--soft)); }
+.cell.full { background: var(--done); }
+.hcol.is-today .cell { outline: 2px solid var(--ink); outline-offset: 1px; }
+.hcol small { font-size: 0.7rem; color: var(--muted); }
+
+.editbtn { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 6px 14px; min-height: 36px; font-weight: 600; font-size: 0.875rem; }
+.editor { display: flex; flex-direction: column; gap: 12px; margin-top: 16px; }
+.erow { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+.field { flex: 1 1 180px; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.field label { font-size: 0.8rem; color: var(--muted); }
+.field input { width: 100%; font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; min-height: 44px; }
+.del { border: 1px solid var(--line); background: transparent; border-radius: 8px; padding: 0 14px; min-height: 44px; color: var(--muted); font-size: 0.875rem; }
+.del.sure { border-color: #B3402F; color: #B3402F; font-weight: 600; }
+.add { align-self: flex-start; border: 1px dashed var(--accent); background: transparent; color: var(--accent); font-weight: 600; border-radius: 10px; padding: 10px 16px; min-height: 44px; }
+
+.foot { font-size: 0.8rem; color: var(--muted); display: flex; flex-direction: column; gap: 6px; }
+
+.item { padding: 0; gap: 0; flex-wrap: nowrap; flex-direction: column; align-items: stretch; }
+.head { display: flex; align-items: center; gap: 14px; width: 100%; min-height: 68px; padding: 12px 14px; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; border-radius: 12px; }
+.head .body { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.head .name, .head .why-q { display: block; }
+.chev { flex: none; color: var(--muted); display: flex; align-items: center; gap: 4px; font-size: 0.8rem; font-weight: 600; }
+.chev svg { width: 20px; height: 20px; }
+.chev svg { transition: transform .15s; }
+.item.open .chev svg { transform: rotate(180deg); }
+.details { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding: 0 14px 14px; }
+.details .confirm { flex: none; width: 100%; }
+.undo { flex: none; border: 0; background: transparent; color: var(--muted); text-decoration: underline; font-size: 0.875rem; min-height: 40px; padding: 0 6px; }
+.confirm { flex: 1 0 100%; display: flex; flex-direction: column; gap: 10px; padding-top: 12px; border-top: 1px solid var(--line); }
+.confirm .ctitle { font-weight: 600; }
+.photo-btn { display: inline-flex; align-items: center; justify-content: center; align-self: flex-start; min-height: 48px; padding: 0 18px; border-radius: 10px; background: var(--accent); color: var(--accent-ink); font-weight: 600; cursor: pointer; }
+.photo-btn input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.photo-btn:focus-within { outline: 3px solid var(--ink); outline-offset: 2px; }
+.preview { max-width: 100%; width: 240px; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 10px; border: 1px solid var(--line); }
+.confirm textarea { width: 100%; font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; min-height: 64px; resize: vertical; }
+.crow { display: flex; flex-wrap: wrap; gap: 8px; }
+.btn { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 0 18px; min-height: 46px; font-weight: 600; }
+label.btn { display: inline-flex; align-items: center; justify-content: center; }
+.btn.primary { background: var(--done); border-color: var(--done); color: var(--accent-ink); }
+.btn.primary:disabled { opacity: .45; cursor: not-allowed; }
+.cerr { color: #B3402F; font-size: 0.875rem; }
+
+.diary { display: flex; flex-direction: column; gap: 18px; margin-top: 14px; }
+.dday h3 { margin: 0 0 8px; font-family: var(--font-display); font-size: 0.95rem; text-transform: capitalize; color: var(--muted); }
+.dentries { display: flex; flex-direction: column; gap: 10px; }
+.dentry { display: flex; gap: 12px; align-items: flex-start; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px; }
+.dentry img { flex: none; width: 88px; height: 88px; object-fit: cover; border-radius: 8px; cursor: zoom-in; }
+.dentry.big { flex-direction: column; }
+.dentry.big img { width: 100%; height: auto; max-height: 70vh; object-fit: contain; cursor: zoom-out; }
+.dtext { min-width: 0; }
+.dtext .dn { font-weight: 600; overflow-wrap: anywhere; }
+.dtext .dt { font-size: 0.8rem; color: var(--muted); }
+.dtext .dnote { margin-top: 4px; overflow-wrap: anywhere; white-space: pre-wrap; }
+.empty { color: var(--muted); font-size: 0.95rem; }
+
+.weeknav { display: flex; gap: 8px; margin-top: 14px; }
+.sumcard { margin-top: 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.sumcard .range { font-family: var(--font-display); font-weight: 700; }
+.wrows { display: flex; flex-direction: column; gap: 8px; }
+.wrow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; }
+.wrow .wn { overflow-wrap: anywhere; }
+.wrow .wv { font-variant-numeric: tabular-nums; font-weight: 600; }
+.wbar { grid-column: 1 / -1; height: 6px; background: var(--soft); border-radius: 99px; overflow: hidden; }
+.wbar i { display: block; height: 100%; background: var(--accent); border-radius: 99px; }
+.sumtext { white-space: pre-wrap; line-height: 1.6; padding-top: 12px; border-top: 1px solid var(--line); }
+.sumnote { font-size: 0.8rem; color: var(--muted); }
+.nudge { background: var(--done-bg); border-radius: 10px; padding: 10px 14px; font-weight: 500; }
+.tpill { flex: none; border: 1px solid var(--line); background: var(--surface); color: var(--accent); font-weight: 600; font-size: 0.875rem; border-radius: 99px; padding: 8px 14px; min-height: 40px; }
+.min.met { color: var(--done); font-weight: 600; }
+.wrow .wv { text-align: right; }
+.why-q { font-style: italic; color: var(--muted); font-size: 0.9rem; margin-top: 2px; overflow-wrap: anywhere; }
+.field textarea { width: 100%; font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; min-height: 72px; resize: vertical; }
+.tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; background: var(--surface); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom, 0px); }
+.tabs-in { display: flex; max-width: 640px; margin-inline: auto; }
+.tab { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 60px; padding: 6px 2px; border: 0; background: transparent; color: var(--muted); font-size: 0.68rem; font-weight: 600; box-shadow: inset 0 3px 0 transparent; }
+.tab svg { width: 24px; height: 24px; }
+.tab[aria-current="page"] { color: var(--accent); box-shadow: inset 0 3px 0 var(--accent); }
+@media (prefers-reduced-motion: reduce) { .bar span, .chev { transition: none; } }
+</style>
+</head>
+<body>
+
+<main class="wrap">
+  <header class="page" data-page="hoje">
+    <p class="eyebrow" id="date"></p>
+    <h1>Foco do Dia</h1>
+    <p class="lede">No dia difícil, só o mínimo já vale.</p>
+  </header>
+
+  <section class="why page" data-page="hoje">
+    <label for="why">Meu porquê</label>
+    <textarea id="why" placeholder="Escreva aqui por que estas prioridades importam para você."></textarea>
+    <p class="hint">Leia este texto antes de começar o dia, principalmente quando estiver difícil.</p>
+  </section>
+
+  <section class="page" data-page="hoje">
+    <div class="sect-head"><h2>Hoje</h2><div class="count" id="count"></div></div>
+    <div class="bar" role="progressbar" aria-label="Prioridades feitas hoje" id="bar"><span id="barfill"></span></div>
+    <p class="msg" id="msg"></p>
+    <div class="stats">
+      <div class="stat"><b id="streak">0</b><span id="streaklabel">dias seguidos com ao menos uma prioridade</span></div>
+      <div class="stat"><b id="focusmin">0 min</b><span>investidos hoje</span></div>
+    </div>
+    <div class="crow" style="margin-top:14px"><button class="editbtn" id="alltoggle" type="button">Recolher tudo</button></div>
+    <ul id="list"></ul>
+  </section>
+
+  <section class="page" data-page="hoje">
+    <h2>Últimos 14 dias</h2>
+    <div class="hist" id="hist"></div>
+  </section>
+
+  <section class="page" data-page="conquistas">
+    <div class="sect-head"><h2>Quadro de conquistas</h2><button class="editbtn" id="winbtn" type="button" aria-expanded="false">+ Registrar</button></div>
+    <div id="wins"></div>
+  </section>
+
+  <section class="page" data-page="diario">
+    <h2>Diário</h2>
+    <p class="hint" style="margin-top:6px">Cada prioridade confirmada com foto aparece aqui. Mostra os últimos 7 dias.</p>
+    <div class="diary" id="diary"></div>
+  </section>
+
+  <section class="page" data-page="resumo">
+    <h2>Resumo da semana</h2>
+    <div class="weeknav" id="weeknav"></div>
+    <div id="nudge"></div>
+    <div class="sumcard" id="sumcard"></div>
+  </section>
+
+  <section class="page" data-page="prioridades">
+    <h2>Minhas prioridades</h2>
+    <p class="hint" style="margin-top:6px">Crie cada prioridade, escreva por que você a quer e defina a versão mínima para os dias difíceis.</p>
+    <div class="editor" id="editor"></div>
+  </section>
+
+  <div class="foot">
+    <p id="status"></p>
+    <p>Seus dados ficam guardados só neste aparelho. Faça uma cópia de vez em quando.</p>
+    <div class="crow" style="margin-top:10px">
+      <button class="btn" type="button" id="bkexp">Salvar cópia</button>
+      <label class="btn" style="cursor:pointer">Restaurar cópia<input type="file" id="bkimp" accept="application/json,.json" hidden></label>
+    </div>
+    <p id="bkmsg" class="hint" role="status"></p>
+  </div>
+
+</main>
+<nav class="tabs" id="tabs" aria-label="Seções do app"></nav>
+
+<script>
+(function () {
+  var LS = 'focodia.v1';
+  var CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+
+  function el(tag, attrs) {
+    var n = document.createElement(tag);
+    attrs = attrs || {};
+    for (var k in attrs) {
+      var v = attrs[k];
+      if (k === 'class') n.className = v;
+      else if (k === 'text') n.textContent = v;
+      else if (k.indexOf('on') === 0) n.addEventListener(k.slice(2), v);
+      else if (v === true) n.setAttribute(k, '');
+      else if (v !== false && v != null) n.setAttribute(k, v);
+    }
+    for (var i = 2; i < arguments.length; i++) {
+      var c = arguments[i];
+      if (c == null) continue;
+      n.append(c.nodeType ? c : document.createTextNode(c));
+    }
+    return n;
+  }
+  function $(id) { return document.getElementById(id); }
+  function pad(n) { return String(n).padStart(2, '0'); }
+  function key(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+  function today() { return key(new Date()); }
+
+  function defaults() {
+    return {
+      priorities: [],
+      why: '', days: {}, focus: {}, time: {}, updatedAt: 0
+    };
+  }
+  function isOldSeed(o) {
+    var p = o.priorities;
+    if (p.length !== 3) return false;
+    var seed = [['p1', 'Estudar para a faculdade', 'Um bloco de 25 minutos'], ['p2', 'Estudar para as certificações', 'Um bloco de 25 minutos'], ['p3', 'Praticar esporte', '20 minutos de movimento']];
+    for (var i = 0; i < 3; i++) {
+      var x = p[i];
+      if (!x || x.id !== seed[i][0] || x.name !== seed[i][1] || x.min !== seed[i][2] || x.why || x.goalDays || x.goalHours) return false;
+    }
+    return !o.why && !Object.keys(o.days).length && !Object.keys(o.focus).length && !Object.keys(o.time).length;
+  }
+  function normalize(d) {
+    var base = defaults();
+    d = d || {};
+    var r = {
+      priorities: Array.isArray(d.priorities) ? d.priorities : base.priorities,
+      why: typeof d.why === 'string' ? d.why : '',
+      days: d.days && typeof d.days === 'object' ? d.days : {},
+      focus: d.focus && typeof d.focus === 'object' ? d.focus : {},
+      time: d.time && typeof d.time === 'object' ? d.time : {},
+      updatedAt: Number(d.updatedAt) || 0
+    };
+    if (isOldSeed(r)) r.priorities = [];
+    return r;
+  }
+  function loadLocal() {
+    try { var raw = localStorage.getItem(LS); if (raw) return normalize(JSON.parse(raw)); } catch (e) {}
+    return null;
+  }
+  var state = loadLocal() || defaults();
+  var editing = true, ref = null, saving = false, dirty = false, saveTimer = null, preset = 0;
+  var confirmDel = {}, openCards = {}, tm = null, wake = null;
+  var LSO = 'focodia.open.v1', allOpen = true;
+  try { if (localStorage.getItem(LSO) === '0') allOpen = false; } catch (e) {}
+
+  /* ---------- salvar ---------- */
+  function setStatus(s) {
+    var t = {
+      saved: 'Salvo na sua conta.',
+      saving: 'Salvando…',
+      local: 'Salvo só neste aparelho.',
+      error: 'Não foi possível salvar na conta. Seus dados continuam neste aparelho.'
+    }[s] || '';
+    $('status').textContent = t;
+  }
+  function touch() {
+    state.updatedAt = Date.now();
+    try { localStorage.setItem(LS, JSON.stringify(state)); } catch (e) {}
+    if (!ref) { setStatus('local'); return; }
+    setStatus('saving');
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(flush, 600);
+  }
+  async function flush() {
+    saveTimer = null;
+    if (!ref) return;
+    if (saving) { dirty = true; return; }
+    saving = true;
+    try { await ref.set(JSON.parse(JSON.stringify(state))); setStatus('saved'); }
+    catch (e) { setStatus('error'); }
+    saving = false;
+    if (dirty) { dirty = false; flush(); }
+  }
+
+  /* ---------- cálculos ---------- */
+  function doneSet(k) { return new Set(state.days[k] || []); }
+  function ids() { return new Set(state.priorities.map(function (p) { return p.id; })); }
+  function anyDone(k) { var s = ids(); return (state.days[k] || []).some(function (i) { return s.has(i); }); }
+  function doneCount(k) { var s = doneSet(k); return state.priorities.filter(function (p) { return s.has(p.id); }).length; }
+  function streak() {
+    var d = new Date();
+    if (!anyDone(key(d))) d.setDate(d.getDate() - 1);
+    var n = 0;
+    while (anyDone(key(d)) && n < 3650) { n++; d.setDate(d.getDate() - 1); }
+    return n;
+  }
+  function focusToday() {
+    var f = state.focus[today()] || {};
+    return Object.keys(f).reduce(function (a, k) { return a + (Number(f[k]) || 0); }, 0);
+  }
+
+  /* ---------- ações ---------- */
+  function pName(id) { var p = state.priorities.filter(function (x) { return x.id === id; })[0]; return p ? p.name : ''; }
+
+  /* ---------- diário: entradas com foto e resumos ---------- */
+  var LSE = 'focodia.entries.v1', LSS = 'focodia.sums.v1';
+  var entries = {}, sums = {}, col = null;
+  var weekOffset = 0, sumBusy = false, sumErr = '', openPhoto = null;
+  var LSW = 'focodia.wins.v1', wins = {};
+  var wf = { open: false, title: '', date: '', note: '', photo: null, busy: false, err: '', msg: '' }, delWin = {};
+  try { entries = JSON.parse(localStorage.getItem(LSE) || '{}') || {}; sums = JSON.parse(localStorage.getItem(LSS) || '{}') || {}; wins = JSON.parse(localStorage.getItem(LSW) || '{}') || {}; } catch (e) {}
+  /* IndexedDB: guarda diário, conquistas e resumos neste aparelho, com espaço de sobra para as fotos */
+  var idbp = null;
+  function idb() {
+    if (idbp) return idbp;
+    idbp = new Promise(function (res, rej) {
+      try {
+        var r = indexedDB.open('focodia', 1);
+        r.onupgradeneeded = function () { r.result.createObjectStore('kv'); };
+        r.onsuccess = function () { res(r.result); };
+        r.onerror = function () { rej(r.error); };
+      } catch (e) { rej(e); }
+    });
+    return idbp;
+  }
+  function idbGet(k) { return idb().then(function (db) { return new Promise(function (res, rej) { var q = db.transaction('kv').objectStore('kv').get(k); q.onsuccess = function () { res(q.result); }; q.onerror = function () { rej(q.error); }; }); }); }
+  function idbSet(k, v) { return idb().then(function (db) { return new Promise(function (res, rej) { var t = db.transaction('kv', 'readwrite'); t.objectStore('kv').put(v, k); t.oncomplete = function () { res(); }; t.onerror = function () { rej(t.error); }; }); }); }
+  var idbOk = false, idbTimer = null;
+  function pruneOldPhotos() {
+    var c = new Date(); c.setDate(c.getDate() - 21); var lim = key(c);
+    Object.keys(entries).forEach(function (i) { var e = entries[i]; if (e && e.date < lim && e.photo) e.photo = ''; });
+  }
+  function saveLocalExtras() {
+    pruneOldPhotos();
+    clearTimeout(idbTimer);
+    idbTimer = setTimeout(function () {
+      idbSet('extras', { entries: entries, sums: sums, wins: wins }).catch(function () {
+        try { localStorage.setItem(LSE, JSON.stringify(entries)); localStorage.setItem(LSS, JSON.stringify(sums)); localStorage.setItem(LSW, JSON.stringify(wins)); } catch (e) {}
+      });
+    }, 150);
+    return true;
+  }
+  /* carrega do IndexedDB ao abrir; migra dados antigos do localStorage se houver */
+  idbGet('extras').then(function (d) {
+    if (d) { entries = d.entries || {}; sums = d.sums || {}; wins = d.wins || {}; }
+    else if (Object.keys(entries).length || Object.keys(sums).length || Object.keys(wins).length) { saveLocalExtras(); }
+    idbOk = true;
+    try { localStorage.removeItem(LSE); } catch (e) {}
+    render(); renderWins(); renderSummary();
+    if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(function () {});
+  }).catch(function () {});
+  function shrink(file) {
+    return new Promise(function (res, rej) {
+      var url = URL.createObjectURL(file), img = new Image();
+      img.onload = function () {
+        var max = 720, w = img.naturalWidth, h = img.naturalHeight, s = Math.min(1, max / Math.max(w, h));
+        w = Math.round(w * s); h = Math.round(h * s);
+        var c = document.createElement('canvas'); c.width = w; c.height = h;
+        c.getContext('2d').drawImage(img, 0, 0, w, h);
+        URL.revokeObjectURL(url);
+        var q = 0.7, out = c.toDataURL('image/jpeg', q);
+        while (out.length > 150000 && q > 0.35) { q -= 0.1; out = c.toDataURL('image/jpeg', q); }
+        res(out);
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); rej(new Error('imagem')); };
+      img.src = url;
+    });
+  }
+  var drafts = {};
+  function D(id) { return drafts[id] || (drafts[id] = { photo: null, note: '', mins: '', busy: false, err: '' }); }
+  function minsOk(c) { var m = Math.round(Number(c.mins)); return (m >= 1 && m <= 720) ? m : 0; }
+  async function confirmDone(id) {
+    var c = D(id);
+    if (c.busy) return;
+    var m = minsOk(c);
+    if (!c.photo) { c.err = 'Adicione a foto para concluir.'; renderConfirmOnly(id); return; }
+    if (!m) { c.err = 'Informe quantos minutos você dedicou (de 1 a 720).'; renderConfirmOnly(id); return; }
+    c.busy = true; c.err = ''; renderConfirmOnly(id);
+    var k = today(), e = { id: 'e-' + k + '-' + id, kind: 'entry', date: k, pid: id, name: pName(id), mins: m, note: c.note.trim(), photo: c.photo, ts: Date.now() };
+    try {
+      if (col) await col.doc(e.id).set(e);
+      entries[e.id] = e;
+      if (!col && !saveLocalExtras()) { delete entries[e.id]; throw new Error('espaco'); }
+    } catch (err) {
+      c.busy = false;
+      c.err = 'Não foi possível guardar a foto. Tente novamente.';
+      renderConfirmOnly(id); return;
+    }
+    var arr = (state.days[k] || []).slice();
+    if (arr.indexOf(id) < 0) arr.push(id);
+    state.days[k] = arr;
+    delete drafts[id]; addTime(id, m * 60); render();
+  }
+  async function undoDone(id) {
+    var k = today(), arr = (state.days[k] || []).filter(function (x) { return x !== id; });
+    if (arr.length) state.days[k] = arr; else delete state.days[k];
+    var eid = 'e-' + k + '-' + id;
+    var prev = entries[eid];
+    if (prev && prev.mins) addTime(id, -prev.mins * 60);
+    delete entries[eid];
+    try { if (col) await col.doc(eid).delete(); else saveLocalExtras(); } catch (e) {}
+    touch(); render();
+  }
+
+  /* ---------- tempo investido ---------- */
+  function fmtDur(s) {
+    s = Math.round(s);
+    if (s <= 0) return '0 min';
+    if (s < 60) return 'menos de 1 min';
+    var h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
+    return h ? h + ' h ' + pad(m) + ' min' : m + ' min';
+  }
+  function secsOf(k, id) { return ((Number((state.time[k] || {})[id]) || 0)) + ((Number((state.focus[k] || {})[id]) || 0) * 60); }
+  function secsDayAll(k) {
+    var a = state.time[k] || {}, f = state.focus[k] || {}, s = 0, x;
+    for (x in a) s += Number(a[x]) || 0;
+    for (x in f) s += (Number(f[x]) || 0) * 60;
+    return s;
+  }
+  function addTime(id, secs, date) {
+    var t = date || today();
+    state.time[t] = state.time[t] || {};
+    var v = (Number(state.time[t][id]) || 0) + secs;
+    if (v > 0) state.time[t][id] = v; else delete state.time[t][id];
+    if (!Object.keys(state.time[t]).length) delete state.time[t];
+    touch();
+  }
+  function addPriority() {
+    var id = 'p' + Date.now().toString(36);
+    state.priorities.push({ id: id, name: '', why: '', min: '' });
+    editing = true; setPage('prioridades'); touch(); render();
+    var f = $('n-' + id);
+    if (f) { f.scrollIntoView({ block: 'center' }); f.focus(); }
+  }
+
+  /* ---------- páginas ---------- */
+  var LSP = 'focodia.page.v1', page = 'hoje';
+  var ICON = {
+    hoje: '<circle cx="12" cy="12" r="9"/><path d="M8 12.5l3 3 5-6"/>',
+    diario: '<path d="M5 4h11a3 3 0 013 3v13H8a3 3 0 01-3-3z"/><path d="M5 17a3 3 0 013-3h11"/>',
+    conquistas: '<path d="M8 4h8v5a4 4 0 01-8 0z"/><path d="M8 6H5a3 3 0 003 4M16 6h3a3 3 0 01-3 4"/><path d="M12 13v4M8.5 20h7"/>',
+    resumo: '<path d="M5 20V11M12 20V5M19 20v-7"/>',
+    prioridades: '<path d="M9 6h11M9 12h11M9 18h11"/><path d="M4.5 6h.01M4.5 12h.01M4.5 18h.01"/>'
+  };
+  var PAGES = [['hoje', 'Hoje'], ['diario', 'Diário'], ['conquistas', 'Conquistas'], ['resumo', 'Resumo'], ['prioridades', 'Prioridades']];
+  function buildTabs() {
+    var inner = el('div', { class: 'tabs-in' });
+    PAGES.forEach(function (p) {
+      var b = el('button', { class: 'tab', type: 'button', 'data-p': p[0], onclick: function () { setPage(p[0]); } });
+      b.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + ICON[p[0]] + '</svg>';
+      b.append(el('span', { text: p[1] }));
+      inner.append(b);
+    });
+    $('tabs').replaceChildren(inner);
+  }
+  function setPage(p) {
+    page = p;
+    try { localStorage.setItem(LSP, p); } catch (e) {}
+    Array.prototype.forEach.call(document.querySelectorAll('.page'), function (n) { n.hidden = n.getAttribute('data-page') !== p; });
+    Array.prototype.forEach.call(document.querySelectorAll('.tab'), function (b) {
+      if (b.getAttribute('data-p') === p) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
+    });
+    render();
+    window.scrollTo(0, 0);
+  }
+
+  /* ---------- tela ---------- */
+  function render() {
+    var t = today(), done = doneSet(t), total = state.priorities.length, n = doneCount(t);
+    $('date').textContent = new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
+    if (document.activeElement !== $('why')) $('why').value = state.why;
+
+    $('count').textContent = n + ' de ' + total;
+    $('barfill').style.width = (total ? (n / total) * 100 : 0) + '%';
+    $('bar').setAttribute('aria-valuenow', String(n));
+    $('bar').setAttribute('aria-valuemax', String(total));
+    $('msg').textContent = !total ? 'Adicione sua primeira prioridade em "Prioridades".'
+      : n === 0 ? 'Comece pelo mínimo. Um bloco já conta.'
+      : n < total ? 'Você já começou. Escolha a próxima.'
+      : 'Tudo feito hoje. Descanse sem culpa.';
+    var s = streak();
+    $('streak').textContent = String(s);
+    $('streaklabel').textContent = (s === 1 ? 'dia seguido' : 'dias seguidos') + ' com ao menos uma prioridade';
+    $('focusmin').textContent = fmtDur(secsDayAll(t));
+
+    $('alltoggle').textContent = allOpen ? 'Recolher tudo' : 'Expandir tudo';
+    $('alltoggle').hidden = !total;
+    var list = $('list'); list.replaceChildren();
+    state.priorities.forEach(function (p) {
+      var isDone = done.has(p.id);
+      var isOpen = openCards[p.id] !== undefined ? openCards[p.id] : allOpen;
+      var mark = el('span', { class: 'check', 'aria-hidden': 'true' });
+      mark.innerHTML = CHECK;
+      var chev = el('span', { class: 'chev', 'aria-hidden': 'true' });
+      chev.innerHTML = '<span>' + (isOpen ? 'Ocultar' : 'Detalhes') + '</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>';
+      var head = el('button', { class: 'head', type: 'button', 'aria-expanded': String(isOpen), onclick: function () {
+        openCards[p.id] = !isOpen;
+        render();
+      } },
+        mark,
+        el('span', { class: 'body' },
+          el('span', { class: 'name', text: p.name || 'Nova prioridade' }),
+          p.why ? el('span', { class: 'why-q', text: '“' + p.why + '”' }) : null),
+        chev);
+      var details = null;
+      if (isOpen) {
+        details = el('div', { class: 'details' },
+          p.min ? el('div', { class: 'min', text: 'Mínimo: ' + p.min }) : null,
+          secsOf(t, p.id) ? el('div', { class: 'min', text: 'Hoje: ' + fmtDur(secsOf(t, p.id)) }) : null,
+          isDone
+            ? el('div', { class: 'crow', style: 'align-items:center' }, el('span', { class: 'min', text: 'Feita hoje.' }), el('button', { class: 'undo', type: 'button', text: 'Desfazer', onclick: function () { undoDone(p.id); } }))
+            : confirmPanel(p));
+      }
+      list.append(el('li', { class: 'item' + (isDone ? ' is-done' : '') + (isOpen ? ' open' : '') }, head, details));
+    });
+    if (!total) {
+      list.append(el('li', { class: 'item', style: 'align-items:flex-start;padding:14px;gap:10px' },
+        el('div', { class: 'name', text: 'Comece pela primeira prioridade' }),
+        el('div', { class: 'min', text: 'Dê um nome, escreva por que você a quer e defina quantas vezes por semana pretende se dedicar.' }),
+        el('button', { class: 'btn primary', type: 'button', text: 'Criar prioridade', onclick: addPriority })));
+    } else {
+      list.append(el('li', {}, el('button', { class: 'add', type: 'button', text: '+ Nova prioridade', onclick: addPriority })));
+    }
+
+    var h = $('hist'); h.replaceChildren();
+    for (var i = 13; i >= 0; i--) {
+      var d = new Date(); d.setDate(d.getDate() - i);
+      var k = key(d), c = doneCount(k), p = total ? Math.round((c / total) * 100) : 0;
+      var label = d.toLocaleDateString('pt-BR', { weekday: 'short', day: 'numeric', month: 'numeric' }) + ': ' + c + ' de ' + total;
+      h.append(el('div', { class: 'hcol' + (i === 0 ? ' is-today' : '') },
+        el('div', { class: 'cell' + (total && c === total ? ' full' : ''), style: '--p:' + p, title: label, role: 'img', 'aria-label': label }),
+        el('small', { text: d.toLocaleDateString('pt-BR', { weekday: 'narrow' }).toUpperCase() })));
+    }
+
+    renderDiary();
+    renderWins();
+    renderSummary();
+    renderEditor();
+  }
+
+  function confirmPanel(p) {
+    var c = D(p.id), id = p.id, btn = null;
+    function sync() { if (btn) btn.disabled = c.busy || !c.photo || !minsOk(c); }
+    var photoIn = el('input', { type: 'file', accept: 'image/*', capture: 'environment', id: 'photo-in-' + id, onchange: function (e) {
+      var f = e.target.files && e.target.files[0]; if (!f) return;
+      c.err = '';
+      shrink(f).then(function (d) { c.photo = d; renderConfirmOnly(id); })
+        .catch(function () { c.err = 'Não consegui ler essa foto. Tente outra.'; renderConfirmOnly(id); });
+    } });
+    var minsIn = el('input', { id: 'cmins-' + id, type: 'number', inputmode: 'numeric', min: '1', max: '720', placeholder: 'Ex.: 40', value: c.mins || '', oninput: function (e) { c.mins = e.target.value; sync(); } });
+    var chips = el('div', { class: 'crow' });
+    [15, 30, 45, 60, 90].forEach(function (m) {
+      chips.append(el('button', { class: 'chip', type: 'button', text: m + ' min', onclick: function () { c.mins = String(m); minsIn.value = String(m); sync(); } }));
+    });
+    btn = el('button', { class: 'btn primary', type: 'button', disabled: c.busy || !c.photo || !minsOk(c), text: c.busy ? 'Salvando…' : 'Concluir', onclick: function () { confirmDone(id); } });
+    return el('div', { class: 'confirm', id: 'confirm-' + id },
+      el('div', { class: 'ctitle', text: 'Para concluir, registre:' }),
+      el('label', { class: 'photo-btn' }, c.photo ? 'Trocar foto' : 'Adicionar foto', photoIn),
+      c.photo ? el('img', { class: 'preview', src: c.photo, alt: 'Foto de confirmação' }) : null,
+      el('div', { class: 'field' }, el('label', { for: 'cmins-' + id, text: 'Tempo dedicado (minutos)' }), minsIn),
+      chips,
+      el('div', { class: 'field' }, el('label', { for: 'cnote-' + id, text: 'Como foi? (opcional)' }),
+        el('textarea', { id: 'cnote-' + id, maxlength: '280', placeholder: 'Em uma frase, como foi', oninput: function (e) { c.note = e.target.value; } }, c.note)),
+      c.err ? el('p', { class: 'cerr', text: c.err }) : null,
+      el('div', { class: 'crow' }, btn));
+  }
+  function renderConfirmOnly(id) {
+    var p = state.priorities.filter(function (x) { return x.id === id; })[0];
+    var node = p && document.getElementById('confirm-' + id);
+    if (node) node.replaceWith(confirmPanel(p)); else render();
+  }
+
+  function renderDiary() {
+    var box = $('diary'); box.replaceChildren();
+    var keys = [];
+    for (var i = 0; i < 7; i++) { var d = new Date(); d.setDate(d.getDate() - i); keys.push(key(d)); }
+    var any = false;
+    keys.forEach(function (k) {
+      var list = Object.keys(entries).map(function (id) { return entries[id]; })
+        .filter(function (e) { return e.date === k; }).sort(function (a, b) { return b.ts - a.ts; });
+      if (!list.length) return;
+      any = true;
+      var parts = k.split('-'), dt = new Date(+parts[0], +parts[1] - 1, +parts[2]);
+      var wrap = el('div', { class: 'dentries' });
+      list.forEach(function (e) {
+        var big = openPhoto === e.id;
+        var img = el('img', { src: e.photo, alt: 'Foto de ' + (e.name || 'atividade'), onclick: function () { openPhoto = big ? null : e.id; renderDiary(); } });
+        wrap.append(el('div', { class: 'dentry' + (big ? ' big' : '') }, img,
+          el('div', { class: 'dtext' },
+            el('div', { class: 'dn', text: e.name || 'Atividade' }),
+            el('div', { class: 'dt', text: new Date(e.ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) + (e.mins ? ' · ' + e.mins + ' min' : '') }),
+            e.note ? el('div', { class: 'dnote', text: e.note }) : null)));
+      });
+      box.append(el('div', { class: 'dday' }, el('h3', { text: dt.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' }) }), wrap));
+    });
+    if (!any) box.append(el('p', { class: 'empty', text: 'Ainda não há registros. Confirme sua primeira prioridade com uma foto.' }));
+  }
+
+  /* ---------- quadro de conquistas ---------- */
+  function winPhotoIn() {
+    return el('input', { type: 'file', accept: 'image/*', id: 'win-photo', onchange: function (e) {
+      var f = e.target.files && e.target.files[0]; if (!f) return;
+      wf.err = '';
+      shrink(f).then(function (d) { wf.photo = d; renderWins(); })
+        .catch(function () { wf.err = 'Não consegui ler essa foto. Tente outra.'; renderWins(); });
+    } });
+  }
+  async function saveWin() {
+    var title = wf.title.trim();
+    if (!title) { wf.err = 'Dê um nome para a conquista.'; renderWins(); return; }
+    if (wf.busy) return;
+    wf.busy = true; wf.err = ''; renderWins();
+    var id = 'win-' + Date.now().toString(36);
+    var w = { id: id, kind: 'win', title: title, date: wf.date || today(), note: wf.note.trim(), ts: Date.now() };
+    if (wf.photo) w.photo = wf.photo;
+    try {
+      if (col) await col.doc(id).set(w);
+      wins[id] = w;
+      if (!col && !saveLocalExtras()) { delete wins[id]; throw new Error('espaco'); }
+    } catch (e) {
+      wf.busy = false; wf.err = 'Não foi possível guardar a conquista. Tente novamente.'; renderWins(); return;
+    }
+    wf = { open: false, title: '', date: '', note: '', photo: null, busy: false, err: '', msg: 'Conquista registrada. Aproveite este momento.' };
+    $('winbtn').setAttribute('aria-expanded', 'false'); $('winbtn').textContent = '+ Registrar';
+    renderWins(); renderSummary();
+  }
+  async function removeWin(id) {
+    delete wins[id]; delete delWin[id];
+    try { if (col) await col.doc(id).delete(); else saveLocalExtras(); } catch (e) {}
+    renderWins(); renderSummary();
+  }
+  function renderWins() {
+    var box = $('wins'); box.replaceChildren();
+    if (wf.msg && !wf.open) box.append(el('div', { class: 'nudge', style: 'margin-top:14px', text: wf.msg }));
+    if (wf.open) {
+      if (!wf.date) wf.date = today();
+      box.append(el('div', { class: 'sumcard' },
+        el('div', { class: 'field' }, el('label', { for: 'win-title', text: 'O que você conquistou?' }),
+          el('input', { id: 'win-title', type: 'text', maxlength: '100', value: wf.title, placeholder: 'Ex.: Passei na prova, perdi 3 kg, fui aprovado na certificação', oninput: function (e) { wf.title = e.target.value; } })),
+        el('div', { class: 'field' }, el('label', { for: 'win-date', text: 'Quando' }),
+          el('input', { id: 'win-date', type: 'date', value: wf.date, max: today(), oninput: function (e) { wf.date = e.target.value; } })),
+        el('div', { class: 'field' }, el('label', { for: 'win-note', text: 'Como foi chegar aqui? (opcional)' }),
+          el('textarea', { id: 'win-note', maxlength: '400', oninput: function (e) { wf.note = e.target.value; }, style: 'width:100%;font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px 12px;min-height:72px;resize:vertical' }, wf.note)),
+        el('label', { class: 'photo-btn' }, wf.photo ? 'Trocar foto' : 'Adicionar foto (opcional)', winPhotoIn()),
+        wf.photo ? el('img', { class: 'preview', src: wf.photo, alt: 'Foto da conquista' }) : null,
+        wf.err ? el('p', { class: 'cerr', text: wf.err }) : null,
+        el('div', { class: 'crow' },
+          el('button', { class: 'btn primary', type: 'button', disabled: wf.busy, text: wf.busy ? 'Salvando…' : 'Salvar conquista', onclick: saveWin }),
+          el('button', { class: 'btn', type: 'button', text: 'Cancelar', onclick: function () { wf.open = false; wf.err = ''; $('winbtn').setAttribute('aria-expanded', 'false'); $('winbtn').textContent = '+ Registrar'; renderWins(); } }))));
+    }
+    var list = Object.keys(wins).map(function (i) { return wins[i]; }).sort(function (a, b) { return (b.date || '').localeCompare(a.date || '') || b.ts - a.ts; });
+    if (!list.length) {
+      if (!wf.open) box.append(el('p', { class: 'empty', style: 'margin-top:14px', text: 'Suas conquistas aparecem aqui: uma certificação, uma prova aprovada, um peso alcançado.' }));
+      return;
+    }
+    var grid = el('div', { class: 'diary', style: 'margin-top:14px' });
+    list.forEach(function (w) {
+      var p = (w.date || '').split('-'), dt = new Date(+p[0], +p[1] - 1, +p[2]);
+      var sure = !!delWin[w.id];
+      grid.append(el('div', { class: 'dentry' },
+        w.photo ? el('img', { src: w.photo, alt: 'Foto de ' + w.title, onclick: function (e) { e.target.closest('.dentry').classList.toggle('big'); } }) : null,
+        el('div', { class: 'dtext' },
+          el('div', { class: 'dn', text: w.title }),
+          el('div', { class: 'dt', text: dt.toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' }) }),
+          w.note ? el('div', { class: 'dnote', text: w.note }) : null,
+          el('button', { class: 'undo', type: 'button', style: 'padding:0;min-height:32px' + (sure ? ';color:#B3402F' : ''), text: sure ? 'Confirmar remoção' : 'Remover', onclick: function () { if (!delWin[w.id]) { delWin[w.id] = true; renderWins(); return; } removeWin(w.id); } }))));
+    });
+    box.append(grid);
+  }
+  $('winbtn').addEventListener('click', function () {
+    wf.open = !wf.open; wf.msg = ''; wf.err = '';
+    this.setAttribute('aria-expanded', String(wf.open)); this.textContent = wf.open ? 'Fechar' : '+ Registrar';
+    renderWins();
+    if (wf.open) { var f = $('win-title'); if (f) f.focus(); }
+  });
+
+  /* ---------- resumo semanal ---------- */
+  function weekDates(offset) {
+    var m = new Date(); m.setHours(12, 0, 0, 0);
+    m.setDate(m.getDate() - ((m.getDay() + 6) % 7) - 7 * offset);
+    var a = []; for (var i = 0; i < 7; i++) { var d = new Date(m); d.setDate(m.getDate() + i); a.push(d); }
+    return a;
+  }
+  function weekStats(offset) {
+    var ds = weekDates(offset), keys = ds.map(key);
+    var span = offset === 0 ? ((new Date().getDay() + 6) % 7) + 1 : 7;
+    var rows = state.priorities.map(function (p) {
+      return { name: p.name || 'Sem nome', secs: keys.reduce(function (a, k) { return a + secsOf(k, p.id); }, 0), days: keys.filter(function (k) { return (state.days[k] || []).indexOf(p.id) >= 0; }).length };
+    });
+    var inWeek = Object.keys(entries).map(function (i) { return entries[i]; }).filter(function (e) { return keys.indexOf(e.date) >= 0; });
+    return {
+      offset: offset, start: ds[0], end: ds[6], span: span, rows: rows,
+      total: rows.reduce(function (a, r) { return a + r.days; }, 0),
+      activeDays: keys.filter(anyDone).length,
+      secs: keys.reduce(function (a, k) { return a + secsDayAll(k); }, 0), prevSecs: weekDates(offset + 1).map(key).reduce(function (a, k) { return a + secsDayAll(k); }, 0),
+      photos: inWeek.length,
+      wins: Object.keys(wins).map(function (i) { return wins[i]; }).filter(function (w) { return keys.indexOf(w.date) >= 0; }).map(function (w) { return w.title; }),
+      notes: inWeek.filter(function (e) { return e.note; }).map(function (e) { return { data: e.date, prioridade: e.name, texto: e.note }; })
+    };
+  }
+  function rowText(r, st) { return r.days + ' de ' + st.span + ' dias · ' + fmtDur(r.secs); }
+  function rowPct(r, st) { return Math.round(Math.min(1, r.days / st.span) * 100); }
+  function rangeLabel(st) {
+    var o = { day: 'numeric', month: 'long' };
+    return st.start.toLocaleDateString('pt-BR', o) + ' a ' + st.end.toLocaleDateString('pt-BR', o);
+  }
+  function fallbackText(st) {
+    var wt = st.wins.length ? ' Conquistas da semana: ' + st.wins.join('; ') + '.' : '';
+    if (!st.total) return 'Nenhuma prioridade foi confirmada nesta semana. Recomeçar com o mínimo de um único dia já é um bom começo.' + wt;
+    var best = st.rows.slice().sort(function (a, b) { return b.days - a.days; })[0];
+    var t = wt.trim() + (wt ? ' ' : '') + 'Você confirmou ' + st.total + (st.total === 1 ? ' atividade' : ' atividades') + ' em ' + st.activeDays + ' de ' + st.span + ' dias.';
+    t += ' Sua prioridade mais constante foi "' + best.name + '", com ' + best.days + (best.days === 1 ? ' dia.' : ' dias.');
+    if (st.secs) {
+      t += ' Você investiu ' + fmtDur(st.secs) + ' nas suas prioridades';
+      var parts = st.rows.filter(function (r) { return r.secs > 0; }).map(function (r) { return fmtDur(r.secs) + ' em ' + r.name; });
+      t += parts.length > 1 ? ': ' + parts.join(', ') + '.' : '.';
+      if (st.prevSecs > 0 && st.offset === 0 && st.secs > st.prevSecs) t += ' Isso já supera a semana passada. Parabéns!';
+      else if (st.secs > 0) t += ' Parabéns pelo tempo dedicado.';
+    }
+    if (st.photos) t += ' O diário ganhou ' + st.photos + (st.photos === 1 ? ' foto.' : ' fotos.');
+    return t;
+  }
+  async function generate(offset) {
+    var st = weekStats(offset);
+    sumBusy = true; sumErr = ''; renderSummary();
+    var text = '', source = 'auto';
+    if (!text) text = fallbackText(st);
+    var id = 'w-' + key(st.start), rec = { id: id, kind: 'summary', week: key(st.start), text: text, source: source, ts: Date.now() };
+    sums[id] = rec;
+    try { if (col) await col.doc(id).set(rec); else saveLocalExtras(); }
+    catch (e) { sumErr = 'Não foi possível guardar este resumo. Ele aparece aqui, mas pode sumir ao recarregar.'; }
+    sumBusy = false; renderSummary();
+  }
+  function renderSummary() {
+    var nav = $('weeknav'); nav.replaceChildren();
+    [[0, 'Esta semana'], [1, 'Semana passada']].forEach(function (o) {
+      nav.append(el('button', { class: 'chip', type: 'button', 'aria-pressed': String(weekOffset === o[0]), text: o[1], onclick: function () { weekOffset = o[0]; sumErr = ''; renderSummary(); } }));
+    });
+    var prev = weekStats(1), prevSaved = sums['w-' + key(prev.start)];
+    var nudge = $('nudge'); nudge.replaceChildren();
+    if (weekOffset === 0 && prev.total > 0 && !prevSaved) {
+      nudge.append(el('div', { class: 'nudge', style: 'margin-top:14px' }, 'O resumo da semana passada ainda não foi gerado. ',
+        el('button', { class: 'undo', type: 'button', text: 'Abrir', onclick: function () { weekOffset = 1; renderSummary(); } })));
+    }
+    var st = weekStats(weekOffset), saved = sums['w-' + key(st.start)];
+    var card = $('sumcard'); card.replaceChildren();
+    card.append(el('div', { class: 'range', text: rangeLabel(st) }));
+    var rows = el('div', { class: 'wrows' });
+    st.rows.forEach(function (r) {
+      rows.append(el('div', { class: 'wrow' },
+        el('span', { class: 'wn', text: r.name }),
+        el('span', { class: 'wv', text: rowText(r, st) }),
+        el('div', { class: 'wbar' }, el('i', { style: 'width:' + rowPct(r, st) + '%' }))));
+    });
+    if (!st.rows.length) rows.append(el('p', { class: 'empty', text: 'Crie uma prioridade para acompanhar a semana.' }));
+    card.append(rows);
+    card.append(el('p', { class: 'hint', text: fmtDur(st.secs) + ' investidos · ' + st.photos + (st.photos === 1 ? ' foto' : ' fotos') + ' no diário' }));
+    if (saved) {
+      card.append(el('div', { class: 'sumtext', text: saved.text }));
+      card.append(el('p', { class: 'sumnote', text: 'Resumo feito com os seus números da semana.' }));
+    }
+    if (sumErr) card.append(el('p', { class: 'cerr', text: sumErr }));
+    card.append(el('div', { class: 'crow' }, el('button', { class: 'btn', type: 'button', disabled: sumBusy, text: sumBusy ? 'Gerando…' : (saved ? 'Gerar de novo' : 'Gerar resumo'), onclick: function () { generate(weekOffset); } })));
+  }
+
+  function renderEditor() {
+    var box = $('editor');
+    box.replaceChildren();
+    state.priorities.forEach(function (p) {
+      var nameIn = el('input', { id: 'n-' + p.id, type: 'text', value: p.name, maxlength: '80', oninput: function (e) { p.name = e.target.value; touch(); refreshLive(); } });
+      var minIn = el('input', { id: 'm-' + p.id, type: 'text', value: p.min || '', maxlength: '100', placeholder: 'Ex.: 25 minutos', oninput: function (e) { p.min = e.target.value; touch(); refreshLive(); } });
+      var sure = !!confirmDel[p.id];
+      var whyIn = el('textarea', { id: 'y-' + p.id, maxlength: '280', placeholder: 'Escreva o motivo real, que faça sentido nos dias difíceis', oninput: function (e) { p.why = e.target.value; touch(); } }, p.why || '');
+      box.append(el('div', { class: 'erow' },
+        el('div', { class: 'field' }, el('label', { for: 'n-' + p.id, text: 'Prioridade' }), nameIn),
+        el('div', { class: 'field', style: 'flex-basis:100%' }, el('label', { for: 'y-' + p.id, text: 'Por que eu quero isso?' }), whyIn),
+        el('div', { class: 'field' }, el('label', { for: 'm-' + p.id, text: 'Versão mínima para dias difíceis' }), minIn),
+        el('button', { class: 'del' + (sure ? ' sure' : ''), type: 'button', text: sure ? 'Confirmar remoção' : 'Remover', onclick: function () {
+          if (!confirmDel[p.id]) { confirmDel[p.id] = true; renderEditor(); return; }
+          state.priorities = state.priorities.filter(function (x) { return x.id !== p.id; });
+          delete confirmDel[p.id]; touch(); render();
+        } })));
+    });
+    box.append(el('button', { class: 'add', type: 'button', text: '+ Adicionar prioridade', onclick: function () {
+      var id = 'p' + Date.now().toString(36);
+      state.priorities.push({ id: id, name: '', min: '' });
+      touch(); render();
+      var f = $('n-' + id); if (f) f.focus();
+    } }));
+  }
+  /* atualiza só a lista de hoje enquanto o usuário digita, sem perder o foco do campo */
+  function refreshLive() {
+    var t = today(), done = doneSet(t);
+    var items = $('list').children;
+    state.priorities.forEach(function (p, i) {
+      var li = items[i]; if (!li) return;
+      li.querySelector('.name').textContent = p.name || 'Sem nome';
+      var m = li.querySelector('.min');
+      if (m) m.textContent = 'Mínimo: ' + p.min;
+    });
+  }
+
+  $('why').addEventListener('input', function (e) { state.why = e.target.value; touch(); });
+  $('alltoggle').addEventListener('click', function () {
+    allOpen = !allOpen; openCards = {};
+    try { localStorage.setItem(LSO, allOpen ? '1' : '0'); } catch (e) {}
+    render();
+  });
+
+  /* ---------- cópia de segurança ---------- */
+  function bkMsg(t) { var n = $('bkmsg'); if (n) n.textContent = t; }
+  $('bkexp').addEventListener('click', function () {
+    var data = JSON.stringify({ app: 'focodia', v: 1, exportedAt: new Date().toISOString(), state: state, entries: entries, sums: sums, wins: wins });
+    var name = 'foco-do-dia-' + key(new Date()) + '.json';
+    var file = new File([data], name, { type: 'application/json' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      navigator.share({ files: [file], title: 'Cópia do Foco do Dia' }).then(function () { bkMsg('Cópia salva.'); }).catch(function () {});
+      return;
+    }
+    var a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000);
+    bkMsg('Cópia baixada: ' + name);
+  });
+  $('bkimp').addEventListener('change', function (e) {
+    var f = e.target.files && e.target.files[0]; e.target.value = '';
+    if (!f) return;
+    f.text().then(function (t) {
+      var d = JSON.parse(t);
+      if (!d || d.app !== 'focodia' || !d.state) throw new Error('x');
+      state = normalize(d.state); state.updatedAt = Date.now();
+      entries = d.entries || {}; sums = d.sums || {}; wins = d.wins || {};
+      try { localStorage.setItem(LS, JSON.stringify(state)); } catch (er) {}
+      saveLocalExtras(); render(); renderWins(); renderSummary();
+      bkMsg('Cópia restaurada.');
+    }).catch(function () { bkMsg('Esse arquivo não é uma cópia válida do Foco do Dia.'); });
+  });
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) render(); });
+
+  render();
+  setStatus('local');
+  buildTabs();
+  var savedPage = null;
+  try { savedPage = localStorage.getItem(LSP); } catch (e) {}
+  setPage(PAGES.some(function (p) { return p[0] === savedPage; }) ? savedPage : 'hoje');
+
+})();
+</script>
+<script>
+if ("serviceWorker" in navigator) { window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); }); }
+</script>
+</body>
+</html>
